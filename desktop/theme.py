@@ -1,0 +1,13 @@
+"""User palette; neutral shades keep text readable on the small LCD."""
+CORAL = "#ff6f4b"
+SALMON = "#fd4c55"
+ROSE = "#e13661"
+BERRY = "#c1246b"
+PLUM = "#a11477"
+BG = "#170f1e"
+SURFACE = "#2b1c31"
+SURFACE_HOVER = "#422039"
+FG = "#fff6f3"
+MUTED = "#cab5c6"
+INK = "#21101d"
+PALETTE = (CORAL, SALMON, ROSE, BERRY, PLUM)
