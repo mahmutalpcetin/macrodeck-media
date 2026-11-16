@@ -66,7 +66,7 @@ class MediaBackend:
         last_composed = None; priority_image = None
         brightness_level=self.brightness_initial; brightness_panel=False
         source_panel=False;source_page=0;displayed_view=None
-        control_tasks=set();media_lock=asyncio.Lock()
+        control_tasks=set();media_lock=asyncio.Lock();media_generation=0
         brightness_drag=BrightnessDrag()
         pending_brightness=None; persist_brightness=False
         def drag_value(value,save=False):
@@ -80,7 +80,8 @@ class MediaBackend:
             value=brightness_drag.move(x,y,phase)
             if value is not None:drag_value(value,phase=='up')
         def select_source(selected):
-            nonlocal track,priority_image
+            nonlocal track,priority_image,media_generation
+            media_generation+=1
             interaction.touch(time.monotonic())
             track=Track(title='Kaynak açılıyor',artist=source_label(selected) if selected else 'Otomatik seçim',source=selected or '',supported_actions=())
             priority_image=None;displayed_controls.transitioning=True
@@ -91,10 +92,12 @@ class MediaBackend:
             status('Kaynak: '+(source_label(selected) if selected else 'Otomatik'),3)
             self.messages.put(('sources',(reader.sources,selected)))
 
-        async def media_action(action,session,requested_at):
+        async def media_action(action,session,requested_at,generation):
             if demo:return
             async with media_lock:
-                if time.monotonic()-requested_at>2.5:return
+                # An already-dispatched Windows request cannot be undone, but
+                # queued requests must not outlive an explicit source/mode change.
+                if demo or generation!=media_generation or time.monotonic()-requested_at>2.5:return
                 try:await reader.control_for(session,action)
                 except Exception as exc:status(str(exc),4)
 
@@ -106,7 +109,7 @@ class MediaBackend:
             if len(control_tasks)>=16:
                 status('Medya kaynağı yanıt vermiyor.',3);return
             session=owner.session
-            task=asyncio.create_task(media_action(action,session,time.monotonic()));control_tasks.add(task)
+            task=asyncio.create_task(media_action(action,session,time.monotonic(),media_generation));control_tasks.add(task)
             task.add_done_callback(control_tasks.discard)
 
         async def navigate(x,y):
@@ -290,6 +293,7 @@ class MediaBackend:
                         screen_settings=value;interaction.idle_seconds=value.idle_seconds
                         interaction.touch(time.monotonic());status('Ekran ayarları kaydedildi.',3)
                     elif kind == "demo":
+                        if demo!=value:media_generation+=1
                         demo = value
                     elif kind == "calibrate":
                         if not device or not device.info.get("touch_enabled"):
