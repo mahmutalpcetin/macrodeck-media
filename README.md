@@ -1,5 +1,7 @@
 # MacroDeck Media
 
+[![Checks](https://github.com/mahmutalpcetin/macrodeck-media/actions/workflows/checks.yml/badge.svg)](https://github.com/mahmutalpcetin/macrodeck-media/actions/workflows/checks.yml)
+
 A DIY touchscreen media controller built with an **ESP32-S3**, a **2.8-inch ILI9341 display**, and a **rotary encoder**. A Windows companion app provides media artwork, playback controls, system volume, and a small system monitor.
 
 **Status: working prototype.** Windows + wired USB is the supported setup. Wi-Fi, Bluetooth transport, battery operation, and the six-key macro pad are future work.
