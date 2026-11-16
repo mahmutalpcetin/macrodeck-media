@@ -81,6 +81,52 @@ class BackendTests(unittest.IsolatedAsyncioTestCase):
     def start(self):self.task=asyncio.create_task(self.backend.run())
     def pointer(self,x,y,phase='down'):self.commands.put(('pointer',{'x':x,'y':y,'phase':phase}))
 
+    async def test_source_change_discards_commands_waiting_for_previous_source(self):
+        entered=asyncio.Event();release=asyncio.Event()
+        self.start();await until(lambda:Device.instances and Device.instances[-1].frames)
+        reader=Reader.instances[-1];original=reader.control_for
+        async def slow_first(session,action):
+            if not entered.is_set():entered.set();await release.wait()
+            return await original(session,action)
+        reader.control_for=slow_first
+        try:
+            self.commands.put(('media','play_pause'))
+            await asyncio.wait_for(entered.wait(),1)
+            self.commands.put(('media','play_pause'))
+            await asyncio.sleep(.08)
+            self.commands.put(('select_source','Spotify'))
+            await until(lambda:reader.pinned_source=='Spotify')
+            release.set()
+            await until(lambda:reader.calls)
+            await asyncio.sleep(.12)
+            self.assertEqual(reader.calls,[('Chrome','play_pause')])
+            await until(lambda:getattr(reader.session,'source_app_user_model_id',None)=='Spotify')
+            self.commands.put(('media','play_pause'))
+            await until(lambda:len(reader.calls)==2)
+            self.assertEqual(reader.calls[-1],('Spotify','play_pause'))
+        finally:release.set()
+
+    async def test_enabling_demo_discards_waiting_live_media_commands(self):
+        entered=asyncio.Event();release=asyncio.Event()
+        self.start();await until(lambda:Device.instances and Device.instances[-1].frames)
+        reader=Reader.instances[-1];original=reader.control_for
+        async def slow_first(session,action):
+            if not entered.is_set():entered.set();await release.wait()
+            return await original(session,action)
+        reader.control_for=slow_first
+        try:
+            self.commands.put(('media','play_pause'))
+            await asyncio.wait_for(entered.wait(),1)
+            self.commands.put(('media','play_pause'))
+            await asyncio.sleep(.08)
+            self.commands.put(('demo',True))
+            await until(lambda:any(kind=='track' and value.demo for kind,value in list(self.messages.queue)))
+            release.set()
+            await until(lambda:reader.calls)
+            await asyncio.sleep(.12)
+            self.assertEqual(reader.calls,[('Chrome','play_pause')])
+        finally:release.set()
+
     async def test_tap_on_old_lcd_page_does_not_close_menu_still_transferring(self):
         from rendering import render_brightness
         from PIL import ImageChops
